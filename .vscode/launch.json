@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mcopy}",
+            "name": "Debug mcopy",
+            "target": "mcopy",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug mcopy"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mcopy}",
+            "name": "Release mcopy",
+            "target": "mcopy",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release mcopy"
+        }
+    ]
+}
