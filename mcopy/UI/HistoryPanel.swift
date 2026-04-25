@@ -50,6 +50,14 @@ class HistoryPanel: NSObject {
         panel?.orderOut(nil)
     }
 
+    func clearAll() {
+        viewModel.items = []
+        viewModel.selectedItem = nil
+        Task {
+            try? await store.clearAll()
+        }
+    }
+
     func toggle() {
         if let panel = panel, panel.isVisible {
             hide()
@@ -138,6 +146,9 @@ class HistoryPanel: NSObject {
             onDelete: { [weak self] item in
                 self?.viewModel.deleteItem(item)
             },
+            onClearAll: { [weak self] in
+                self?.clearAll()
+            },
             onClose: { [weak self] in
                 self?.hide()
             }
@@ -202,8 +213,10 @@ class HistoryViewModel: ObservableObject {
 
 struct HistoryView: View {
     @StateObject var viewModel: HistoryViewModel
+    @State private var showClearConfirm = false
     let onPaste: (ClipboardItem) -> Void
     let onDelete: (ClipboardItem) -> Void
+    let onClearAll: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -247,6 +260,26 @@ struct HistoryView: View {
                 .foregroundColor(.secondary)
             Spacer()
             Button(action: {
+                showClearConfirm = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "trash")
+                    Text("Clear")
+                }
+                .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.red)
+            .disabled(viewModel.items.isEmpty)
+            .alert("Clear History", isPresented: $showClearConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Clear All", role: .destructive) {
+                    onClearAll()
+                }
+            } message: {
+                Text("Delete all clipboard history? This cannot be undone.")
+            }
+            Button(action: {
                 if let item = viewModel.selectedItem {
                     onPaste(item)
                 }
@@ -260,7 +293,7 @@ struct HistoryView: View {
             .buttonStyle(.plain)
             .foregroundColor(viewModel.selectedItem != nil ? .accentColor : .secondary)
             .disabled(viewModel.selectedItem == nil)
-            Text("Enter paste · Delete remove · Esc close")
+            Text("Enter paste · Del remove · Esc close")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
