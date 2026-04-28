@@ -25,6 +25,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         AppSettings.shared.launchAtLogin = AppSettings.syncLaunchAtLoginState()
 
+        // 检查辅助功能权限
+        AccessibilityPermission.shared.checkOnLaunch()
+
         Task {
             await initializeComponents()
         }

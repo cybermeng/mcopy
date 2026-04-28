@@ -67,28 +67,68 @@ class HistoryPanel: NSObject {
     }
 
     func pasteAndHide(_ item: ClipboardItem) {
-        if item.contentType == .image, let image = item.loadImage() {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.writeObjects([image])
-        } else {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(item.content, forType: .string)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        var writeSuccess = false
+        switch item.contentType {
+        case .image:
+            if let image = item.loadImage() {
+                writeSuccess = pasteboard.writeObjects([image])
+            }
+        case .rtf:
+            if let data = item.content.data(using: .utf8) {
+                pasteboard.setData(data, forType: .rtf)
+                writeSuccess = true
+            }
+        case .html:
+            if let data = item.content.data(using: .utf8) {
+                pasteboard.setData(data, forType: .html)
+                writeSuccess = true
+            }
+        case .fileURL:
+            let urls = item.content.components(separatedBy: "\n").compactMap { URL(fileURLWithPath: $0) }
+            if !urls.isEmpty {
+                writeSuccess = pasteboard.writeObjects(urls as [NSPasteboardWriting])
+            }
+        case .text, .unknown:
+            writeSuccess = pasteboard.setString(item.content, forType: .string)
+        }
+
+        guard writeSuccess else {
+            print("Failed to write to pasteboard")
+            return
         }
 
         let prevApp = previousApp
         hide()
         NSApp.hide(nil)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            prevApp?.activate()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                let source = CGEventSource(stateID: .hidSystemState)
-                let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
-                let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-                keyDown?.flags = .maskCommand
-                keyUp?.flags = .maskCommand
-                keyDown?.post(tap: .cghidEventTap)
-                keyUp?.post(tap: .cghidEventTap)
+        // 使用 AX API 进行粘贴，需要辅助功能权限
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            prevApp?.activate(options: .activateIgnoringOtherApps)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                // 使用 kCGHIDEventTap 确保系统级别的事件投递
+                guard let source = CGEventSource(stateID: .combinedSessionState) else {
+                    print("Failed to create event source")
+                    return
+                }
+
+                let keyV: CGKeyCode = 0x09  // 'v' key
+
+                guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: true),
+                      let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: false) else {
+                    print("Failed to create keyboard events")
+                    return
+                }
+
+                keyDown.flags = .maskCommand
+                keyUp.flags = .maskCommand
+
+                // 先 post keyDown，再 post keyUp
+                keyDown.post(tap: .cghidEventTap)
+                keyUp.post(tap: .cghidEventTap)
             }
         }
     }
